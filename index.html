@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>へんしんランナー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #6ec3f4; }
+  body { display: flex; align-items: center; justify-content: center;
+         font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Meiryo", sans-serif;
+         user-select: none; -webkit-user-select: none; }
+  #stage { position: relative; overflow: hidden; }
+  #game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: pointer; }
+
+  .overlay { position: absolute; inset: 0; display: flex; flex-direction: column;
+             align-items: center; justify-content: center; gap: 1.2em;
+             background: rgba(255, 255, 255, 0.35); cursor: pointer; }
+  .hidden { display: none !important; }
+
+  .logo { font-weight: 800; font-size: 4.6em; line-height: 1; letter-spacing: 0.04em;
+          color: #ff7a1a; -webkit-text-stroke: 0.09em #fff; paint-order: stroke fill;
+          text-shadow: 0 0.08em 0 #c94f00; }
+  .logo span:last-child { color: #2f80ed; text-shadow: 0 0.08em 0 #1a4f9c; }
+
+  .parade { display: flex; gap: 0.6em; }
+  .parade img { width: 4.2em; height: 4.2em; animation: hop 0.9s ease-in-out infinite; }
+  @keyframes hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-0.9em); } }
+
+  #play { font-family: inherit; font-weight: 800; font-size: 3.6em; color: #fff;
+          background: #ff7a1a; border: 0.08em solid #fff; border-radius: 0.6em;
+          padding: 0.15em 1.1em 0.2em; box-shadow: 0 0.14em 0 #c94f00;
+          cursor: pointer; animation: pulse 1.1s ease-in-out infinite; }
+  #play:hover { background: #ff8c33; }
+  @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+
+  .howto { font-weight: 800; font-size: 1.8em; color: #1f3b73; background: rgba(255,255,255,0.9);
+           border-radius: 0.6em; padding: 0.3em 0.9em; }
+  .key { display: inline-block; background: #fff; border: 0.1em solid #1f3b73; border-bottom-width: 0.22em;
+         border-radius: 0.35em; padding: 0 0.45em; margin: 0 0.15em; color: #1f3b73; }
+
+  .credit { position: absolute; right: 0.8em; bottom: 0.5em; font-size: 0.75em; color: #1f3b73; opacity: 0.8; }
+  .credit a { color: inherit; }
+
+  #loading { font-weight: 800; font-size: 2.4em; color: #1f3b73; }
+
+  #mute { position: absolute; left: 0.8em; top: 0.8em; width: 2.6em; height: 2.6em; font-size: 1.3em;
+          border-radius: 50%; border: 0.12em solid #1f3b73; background: rgba(255,255,255,0.92);
+          cursor: pointer; padding: 0; line-height: 1; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game"></canvas>
+
+  <div id="loading" class="overlay">よみこみちゅう…</div>
+
+  <div id="title" class="overlay hidden">
+    <div class="logo"><span>へんしん</span><span>ランナー</span></div>
+    <div class="parade">
+      <img src="assets/1f425.svg" alt="" style="animation-delay:0s">
+      <img src="assets/1f34e.svg" alt="" style="animation-delay:.15s">
+      <img src="assets/1f436.svg" alt="" style="animation-delay:.3s">
+      <img src="assets/1f43c.svg" alt="" style="animation-delay:.45s">
+      <img src="assets/1f996.svg" alt="" style="animation-delay:.6s">
+      <img src="assets/1f369.svg" alt="" style="animation-delay:.75s">
+    </div>
+    <button id="play" tabindex="-1">▶ あそぶ</button>
+    <div class="howto"><span class="key">スペース</span> か <span class="key">エンター</span> で ジャンプ！</div>
+    <div class="credit">え：<a href="https://github.com/jdecked/twemoji" target="_blank" rel="noopener">Twemoji</a>（CC-BY 4.0）</div>
+  </div>
+
+  <button id="mute" tabindex="-1" class="hidden" aria-label="おと">🔊</button>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
