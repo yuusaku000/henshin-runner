@@ -139,7 +139,7 @@ function tone(type, f0, f1, dur, vol = 0.2, delay = 0) {
   o.start(t);
   o.stop(t + dur + 0.05);
 }
-function noise(dur, vol, delay = 0) {
+function noise(dur, vol, delay = 0, fStart = 2500, attack = 0) {
   if (!ac || muted) return;
   const t = ac.currentTime + delay;
   const len = Math.floor(ac.sampleRate * dur);
@@ -150,10 +150,16 @@ function noise(dur, vol, delay = 0) {
   src.buffer = buf;
   const f = ac.createBiquadFilter();
   f.type = 'lowpass';
-  f.frequency.setValueAtTime(2500, t);
+  f.frequency.setValueAtTime(fStart, t);
   f.frequency.exponentialRampToValueAtTime(80, t + dur);
   const gn = ac.createGain();
-  gn.gain.setValueAtTime(vol, t);
+  if (attack > 0) {
+    // いきなり大きくならないよう、すこしずつ音を大きくする
+    gn.gain.setValueAtTime(0.0001, t);
+    gn.gain.linearRampToValueAtTime(vol, t + attack);
+  } else {
+    gn.gain.setValueAtTime(vol, t);
+  }
   gn.gain.exponentialRampToValueAtTime(0.001, t + dur);
   src.connect(f).connect(gn).connect(master);
   src.start(t);
@@ -161,7 +167,12 @@ function noise(dur, vol, delay = 0) {
 const sfx = {
   jump() { tone('square', 380, 760, 0.14, 0.1); },
   spin() { for (let i = 0; i < 13; i++) tone('triangle', 500 + i * 80, 650 + i * 80, 0.08, 0.14, i * 0.1); },
-  boom() { noise(0.8, 0.7); tone('sine', 170, 40, 0.6, 0.5); },
+  // へんしんの「ぼわん」：やわらかい低い音 ＋ キラキラ音（はれつ音にならないよう 高い音をけずって 小さめに）
+  boom() {
+    noise(0.9, 0.22, 0, 700, 0.06);
+    tone('sine', 220, 70, 0.7, 0.35);
+    [1047, 1319, 1568, 2093].forEach((f, i) => tone('sine', f, f * 1.001, 0.35, 0.08, 0.05 + i * 0.06));
+  },
   fanfare() { [784, 988, 1175, 1568].forEach((f, i) => tone('triangle', f, f * 1.001, i === 3 ? 0.45 : 0.13, 0.18, 0.15 + i * 0.1)); },
   hit() { tone('square', 520, 140, 0.35, 0.13); },
   fall() { tone('sine', 900, 160, 0.7, 0.25); },
