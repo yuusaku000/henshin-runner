@@ -44,6 +44,26 @@
   .credit { position: absolute; right: 0.8em; bottom: 0.5em; font-size: 0.75em; color: #1f3b73; opacity: 0.8; }
   .credit a { color: inherit; }
 
+  /* キーボードの案内 */
+  #guide { background: rgba(255, 255, 255, 0.8); gap: 0.8em; cursor: default; }
+  .gtitle { font-weight: 800; font-size: 3em; color: #1f3b73; }
+  .gsub { font-weight: 800; font-size: 2.3em; color: #ff7a1a; animation: pulse 1s ease-in-out infinite; }
+  #kb { position: relative; display: grid; grid-template-columns: repeat(60, 0.66em);
+        grid-template-rows: repeat(5, 2.7em); padding: 0.6em; margin: 0.4em 0 2.6em;
+        background: #3b4252; border-radius: 1em; }
+  .k { margin: 0.14em; background: #e5e9f0; border-radius: 0.4em; box-shadow: inset 0 -0.25em 0 #b8c0cc; }
+  .k.hot { position: relative; z-index: 1; background: #ff7a1a; box-shadow: inset 0 -0.3em 0 #c94f00;
+           color: #fff; font-weight: 800; display: flex; align-items: center; justify-content: center;
+           animation: glow 0.7s ease-in-out infinite alternate; }
+  .k.hot > span { font-size: 1.35em; }
+  @keyframes glow { from { transform: scale(1); } to { transform: scale(1.08); } }
+  .here { position: absolute; white-space: nowrap; font-weight: 800; font-size: 1.7em; color: #ff2a2a;
+          -webkit-text-stroke: 0.16em #fff; paint-order: stroke fill; }
+  .here.below { top: 100%; left: 50%; animation: bobY 0.5s ease-in-out infinite alternate; }
+  .here.right { left: 100%; top: 50%; animation: bobX 0.5s ease-in-out infinite alternate; }
+  @keyframes bobY { from { transform: translate(-50%, 0.1em); } to { transform: translate(-50%, 0.5em); } }
+  @keyframes bobX { from { transform: translate(0.2em, -50%); } to { transform: translate(0.7em, -50%); } }
+
   #loading { font-weight: 800; font-size: 2.4em; color: #1f3b73; }
 
   #mute { position: absolute; left: 0.8em; top: 0.8em; width: 2.6em; height: 2.6em; font-size: 1.3em;
@@ -64,12 +84,17 @@
       <img src="assets/1f34e.svg" alt="" style="animation-delay:.15s">
       <img src="assets/1f436.svg" alt="" style="animation-delay:.3s">
       <img src="assets/1f43c.svg" alt="" style="animation-delay:.45s">
-      <img src="assets/1f996.svg" alt="" style="animation-delay:.6s">
+      <img src="assets/1f438.svg" alt="" style="animation-delay:.6s">
       <img src="assets/1f369.svg" alt="" style="animation-delay:.75s">
     </div>
     <button id="play" tabindex="-1">▶ あそぶ</button>
-    <div class="howto"><span class="key">スペース</span> か <span class="key">エンター</span> で ジャンプ！</div>
     <div class="credit">え：<a href="https://github.com/jdecked/twemoji" target="_blank" rel="noopener">Twemoji</a>（CC-BY 4.0）</div>
+  </div>
+
+  <div id="guide" class="overlay hidden">
+    <div class="gtitle">ジャンプは この キー！</div>
+    <div id="kb"></div>
+    <div class="gsub">どっちかを おすと スタート！</div>
   </div>
 
   <button id="mute" tabindex="-1" class="hidden" aria-label="おと">🔊</button>

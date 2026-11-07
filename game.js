@@ -16,6 +16,10 @@ const CHANGE_EVERY_M = 100;      // 何mごとにへんしんするか
 const FOOT = 22;                 // 足のはば（穴に落ちる判定をゆるくする）
 const FONT = '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Meiryo", sans-serif';
 
+// もとの絵が 左むきなので、右むきに ひっくり返す キャラ
+// （ぞう・イルカ・くるま・きかんしゃ・しょうぼうしゃ・きょうりゅう・ユニコーン）
+const FLIP = new Set(['1f418', '1f42c', '1f697', '1f682', '1f692', '1f996', '1f984']);
+
 // 自分のキャラ（絵文字のコード, なまえ）
 const CHARS = [
   ['1f425', 'ひよこ'], ['1f34e', 'りんご'], ['1f436', 'いぬ'], ['1f431', 'ねこ'],
@@ -26,15 +30,16 @@ const CHARS = [
   ['1f349', 'すいか'], ['1f984', 'ユニコーン'], ['1f419', 'タコ'], ['1f354', 'ハンバーガー'],
   ['1f437', 'ぶた'], ['1f435', 'さる'], ['1f697', 'くるま'], ['1f680', 'ロケット'],
   ['1f682', 'きかんしゃ'], ['1f692', 'しょうぼうしゃ'],
-].map(([cp, name]) => ({ cp, name }));
+].map(([cp, name]) => ({ cp, name, flip: FLIP.has(cp) }));
 
 // てき
 const ENEMY_TYPES = [
-  { cp: '1f980', size: 80, amp: 45, freq: 2.2 },  // かに（よこにうろうろ）
-  { cp: '1f40c', size: 78, amp: 20, freq: 0.8 },  // かたつむり
-  { cp: '1f335', size: 86, amp: 0,  freq: 0 },    // サボテン
-  { cp: '1f994', size: 78, amp: 40, freq: 1.6 },  // はりねずみ
-  { cp: '1faa8', size: 76, amp: 0,  freq: 0 },    // いわ
+  // amp: うごく はば（0 = うごかない）
+  { cp: '1f980', size: 80, amp: 0, freq: 0 },  // かに
+  { cp: '1f40c', size: 78, amp: 0, freq: 0 },  // かたつむり
+  { cp: '1f335', size: 86, amp: 0, freq: 0 },  // サボテン
+  { cp: '1f994', size: 78, amp: 0, freq: 0 },  // はりねずみ
+  { cp: '1faa8', size: 76, amp: 0, freq: 0 },  // いわ
 ];
 const DECOR = ['2600', '2601', '26f0', '1f333', '1f332', '1f337', '1f33c', '1f3e0'];
 const FX = ['1f4a5', '2b50', '2728', '1f389', '1f4ab'];
@@ -44,6 +49,7 @@ const stage = document.getElementById('stage');
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const titleEl = document.getElementById('title');
+const guideEl = document.getElementById('guide');
 const loadingEl = document.getElementById('loading');
 const muteBtn = document.getElementById('mute');
 let scale = 1;
@@ -262,6 +268,7 @@ function startGame() {
   newGame();
   state = 'play';
   titleEl.classList.add('hidden');
+  guideEl.classList.add('hidden');
   muteBtn.classList.remove('hidden');
   sfx.start();
   addText('スタート！', W / 2, 200, '#ff7a1a', 72, 1.3);
@@ -271,6 +278,8 @@ function startGame() {
 function update(dt) {
   g.time += dt;
   updateEffects(dt);
+  // へんしんした キャラを見せている間は ゲームを止める
+  if (g.showcase) { g.showcase.t += dt; return; }
   if (g.transform) updateTransform(dt);
   if (g.dying) { updateDying(dt); return; }
 
@@ -345,8 +354,8 @@ function spawn() {
     const x = g.nextSpawn;
     const m = (x - PLAYER_X) / PX_PER_M;
     const r = m % CHANGE_EVERY_M;
-    // さいしょ と へんしんの まわりは 何もおかない
-    if (m < 15 || r > CHANGE_EVERY_M - 6 || r < 18) { g.nextSpawn += 80; continue; }
+    // さいしょ と へんしんの まえ8m・あと30m は 敵も穴も おかない
+    if (m < 15 || r > CHANGE_EVERY_M - 8 || r < 30) { g.nextSpawn += 80; continue; }
     if (Math.random() < 0.4) {
       const w = Math.min(115, Math.max(64, g.speed * 0.4)) + rand(0, 14);
       g.holes.push({ x, w });
@@ -419,8 +428,22 @@ function updateTransform(dt) {
     g.particles.push({ cp: '1f4a5', x: PLAYER_X, y: cy, vx: 0, vy: 0, rot: 0, vr: 0, size: 60, grow: 520, t: 0, life: 0.55, grav: 0 });
     burst(PLAYER_X, cy, 26, 220, 560, ['2b50', '2728', '1f389', '1f4ab']);
     addText('ぼかーん！', PLAYER_X + 150, cy - 50, '#ff4d4d', 66, 1.1);
+    // ここで ゲームを止めて、キャラを大きく見せる
+    g.transform = null;
+    g.showcase = { t: 0 };
   }
-  if (tr.t >= 4.8) g.transform = null;
+}
+
+const SHOWCASE_DELAY = 0.5;   // ぼかーん のあと、大きく見せるまでの秒数
+const SHOWCASE_LOCK = 1.4;    // この秒数まではキーを押しても進まない（連打でとばさないため）
+
+function resumeFromShowcase() {
+  if (!g.showcase || g.showcase.t < SHOWCASE_LOCK) return;
+  g.showcase = null;
+  g.inv = Math.max(g.inv, 1.0);
+  g.jumpBuf = 0;
+  sfx.start();
+  addText('しゅっぱつ！', W / 2, 200, '#ff7a1a', 64, 1.0);
 }
 
 function updateEffects(dt) {
@@ -461,6 +484,7 @@ function render() {
     drawTransformUI();
     drawHUD();
     drawHint();
+    drawShowcase();
   }
   if (g.flash > 0) {
     ctx.fillStyle = `rgba(255,255,255,${g.flash / 0.2 * 0.8})`;
@@ -623,6 +647,7 @@ function drawPlayer() {
     ctx.fill();
   }
 
+  if (ch.flip) { sx = -sx; rot = -rot; }
   drawSprite(ch.cp, x, y, PSIZE, rot, sx, sy, alpha);
 }
 
@@ -659,31 +684,96 @@ function drawTransformUI() {
     ctx.rotate(Math.sin(t * 12) * 0.04);
     outlined(full.slice(0, n), 0, 0, 58, '#8a4dff');
     ctx.restore();
-    return;
   }
-  // なまえを 大きく だす
-  const bt = t - 1.45;
-  if (bt < 0) return;
-  const ch = CHARS[g.cur];
-  const inS = easeOutBack(Math.min(1, bt / 0.45));
-  const alpha = t > 4.3 ? Math.max(0, (4.8 - t) / 0.5) : 1;
+}
+
+// へんしんした キャラを まんなかに 大きく
+function drawShowcase() {
+  const s = g.showcase;
+  if (!s) return;
+  const t = s.t - SHOWCASE_DELAY;
+  if (t < 0) return;
+  const a = Math.min(1, t / 0.3);
+  ctx.fillStyle = `rgba(20, 30, 60, ${0.6 * a})`;
+  ctx.fillRect(0, 0, W, H);
+
+  const pop = easeOutBack(Math.min(1, t / 0.5));
   ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.translate(W / 2, 165);
-  ctx.scale(inS, inS);
-  ctx.font = `800 82px ${FONT}`;
-  const nameW = ctx.measureText(ch.name).width;
-  const boxW = Math.max(420, nameW + 200);
-  roundRect(-boxW / 2, -95, boxW, 190, 36);
-  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx.globalAlpha = a;
+  ctx.translate(W / 2, H / 2);
+  ctx.scale(pop, pop);
+  ctx.translate(-W / 2, -H / 2);
+
+  roundRect(W / 2 - 320, 28, 640, 484, 44);
+  ctx.fillStyle = 'rgba(255,255,255,0.97)';
   ctx.fill();
-  ctx.lineWidth = 7;
+  ctx.lineWidth = 9;
   ctx.strokeStyle = '#ffb300';
   ctx.stroke();
-  outlined('へんしん！', 0, -52, 36, '#ff7a1a');
-  drawSprite(ch.cp, -nameW / 2 - 50, 30, 86, Math.sin(g.time * 6) * 0.15);
-  outlined(ch.name, 40, 30, 82, '#2f80ed');
+
+  outlined('へんしん！', W / 2, 82, 46, '#ff7a1a');
+
+  // まわりの キラキラ
+  for (let i = 0; i < 6; i++) {
+    const ang = g.time * 1.5 + i * (Math.PI * 2 / 6);
+    drawSprite(i % 2 ? '2b50' : '2728', W / 2 + Math.cos(ang) * 170, 240 + Math.sin(ang) * 110, 40);
+  }
+  const ch = CHARS[g.cur];
+  drawSprite(ch.cp, W / 2, 240 + Math.sin(g.time * 3) * 8, 220, Math.sin(g.time * 2) * 0.08, ch.flip ? -1 : 1, 1);
+
+  // なまえ（長い名前は 小さくして 枠に おさめる）
+  ctx.font = `800 100px ${FONT}`;
+  const nw = ctx.measureText(ch.name).width;
+  const size = Math.min(100, 100 * 560 / nw);
+  outlined(ch.name, W / 2, 400, size, '#2f80ed');
+
+  // 「スペース か エンター で つぎへ！」
+  if (s.t >= SHOWCASE_LOCK) {
+    const ps = 1 + Math.sin(g.time * 6) * 0.05;   // ちかちか ではなく、ふわふわ大きさを変える
+    ctx.save();
+    ctx.translate(W / 2, 470);
+    ctx.scale(ps, ps);
+    drawPrompt(0, 0, 'で つぎへ！');
+    ctx.restore();
+  }
   ctx.restore();
+}
+
+function drawKeycap(label, x, y) {
+  ctx.font = `800 24px ${FONT}`;
+  const w = ctx.measureText(label).width + 28;
+  roundRect(x, y - 22, w, 44, 10);
+  ctx.fillStyle = '#ff7a1a';
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#c94f00';
+  ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x + 14, y + 1);
+  return w;
+}
+
+function drawPrompt(cx, cy, tail) {
+  ctx.font = `800 24px ${FONT}`;
+  const w1 = ctx.measureText('スペース').width + 28;
+  const w2 = ctx.measureText('エンター').width + 28;
+  ctx.font = `800 26px ${FONT}`;
+  const wk = ctx.measureText(' か ').width;
+  const wt = ctx.measureText(' ' + tail).width;
+  let x = cx - (w1 + wk + w2 + wt) / 2;
+  x += drawKeycap('スペース', x, cy);
+  ctx.font = `800 26px ${FONT}`;
+  ctx.fillStyle = '#1f3b73';
+  ctx.textAlign = 'left';
+  ctx.fillText(' か ', x, cy + 1);
+  x += wk;
+  x += drawKeycap('エンター', x, cy);
+  ctx.font = `800 26px ${FONT}`;
+  ctx.fillStyle = '#1f3b73';
+  ctx.textAlign = 'left';
+  ctx.fillText(' ' + tail, x, cy + 1);
 }
 
 function drawHUD() {
@@ -749,26 +839,77 @@ function drawHint() {
 }
 
 // ===== そうさ =====
-function press() {
+function showGuide() {
   initAudio();
-  if (state === 'title') { startGame(); return; }
-  if (state === 'play') g.jumpBuf = 0.15;
+  state = 'guide';
+  titleEl.classList.add('hidden');
+  guideEl.classList.remove('hidden');
+  sfx.respawn();
+}
+function press(fromKey) {
+  initAudio();
+  if (state === 'title') { showGuide(); return; }
+  // キーの場所をおぼえてもらうため、案内画面は キーでだけ すすむ
+  if (state === 'guide') { if (fromKey) startGame(); return; }
+  if (state === 'play') {
+    if (g.showcase) { resumeFromShowcase(); return; }
+    g.jumpBuf = 0.15;
+  }
 }
 addEventListener('keydown', (e) => {
   if (e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter' || e.key === ' ' || e.key === 'Enter') {
     e.preventDefault();
     if (e.repeat) return;
-    press();
+    press(true);
   }
 });
-canvas.addEventListener('pointerdown', (e) => { e.preventDefault(); press(); });
-titleEl.addEventListener('pointerdown', (e) => { e.preventDefault(); if (state === 'title') startGame(); });
+canvas.addEventListener('pointerdown', (e) => { e.preventDefault(); press(false); });
+titleEl.addEventListener('pointerdown', (e) => { e.preventDefault(); press(false); });
 muteBtn.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   e.stopPropagation();
   muted = !muted;
   muteBtn.textContent = muted ? '🔇' : '🔊';
 });
+
+// ===== キーボードの絵（スペースとエンターを光らせる） =====
+function buildKeyboard() {
+  const kb = document.getElementById('kb');
+  const Q = 4; // キー1こ = 4マス
+  const rows = [
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2],
+    [1.25, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 'enter'],
+    [1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.75],
+    [2.25, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.75],
+    [1.25, 1.25, 1.25, 1.25, 'space', 1.25, 1.25, 1.25, 1.25],
+  ];
+  rows.forEach((row, r) => {
+    let col = 0;
+    for (const k of row) {
+      const el = document.createElement('div');
+      el.className = 'k';
+      if (k === 'enter') {
+        el.classList.add('hot');
+        el.style.gridColumn = `${col + 1} / span ${1.75 * Q}`;
+        el.style.gridRow = `${r + 1} / span 2`;
+        el.innerHTML = '<span style="font-size:1.05em;white-space:nowrap">エンター</span><div class="here right">◀ ここ！</div>';
+        col += 1.75 * Q;
+      } else if (k === 'space') {
+        el.classList.add('hot');
+        el.style.gridColumn = `${col + 1} / span ${5 * Q}`;
+        el.style.gridRow = `${r + 1}`;
+        el.innerHTML = '<span>スペース</span><div class="here below">▲ ここ！</div>';
+        col += 5 * Q;
+      } else {
+        el.style.gridColumn = `${col + 1} / span ${k * Q}`;
+        el.style.gridRow = `${r + 1}`;
+        col += k * Q;
+      }
+      kb.appendChild(el);
+    }
+  });
+}
+buildKeyboard();
 
 // ===== ループ =====
 let last = performance.now();
